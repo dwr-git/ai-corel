@@ -135,7 +135,7 @@ fn show(app: &mut VectorcraftApp, ctx: &egui::Context) {
     let mut action = None;
     egui::Area::new(id).order(Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
         egui::Frame::NONE
-            .fill(t.panel)
+            .fill(t.float_fill())
             .stroke(Stroke::new(1.0, t.tool_active))
             .corner_radius(CornerRadius::same(5))
             .inner_margin(egui::Margin::symmetric(8, 6))

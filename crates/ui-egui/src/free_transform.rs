@@ -54,7 +54,7 @@ pub(crate) fn show(app: &mut VectorcraftApp, ui: &Ui, canvas: Rect) {
     let mut set: Option<(&str, Value)> = None;
     egui::Area::new(egui::Id::new(TOOL)).order(egui::Order::Middle).fixed_pos(canvas.min + vec2(10.0, 10.0)).show(ui.ctx(), |ui| {
         egui::Frame::NONE
-            .fill(t.panel)
+            .fill(t.float_fill())
             .stroke(Stroke::new(1.0, t.button_border))
             .corner_radius(CornerRadius::same(4))
             .inner_margin(egui::Margin::same(3))

@@ -307,7 +307,7 @@ fn language_command_sets_the_preference() {
     // Every registered language is in the Mac App menu's Language, by its own name (the in-window
     // bar has no Language menu).
     let layout = crate::native_menu::mac_layout(&app, &crate::native_menu::from_tree(&app, &crate::menus::menu_tree()), Lang::EN);
-    let app_menu = layout.bar.menus.into_iter().find(|m| m.title == "VectorCraft").expect("App menu");
+    let app_menu = layout.bar.menus.into_iter().find(|m| m.title == crate::native_menu::APP_NAME).expect("App menu");
     fn items(nodes: &[crate::native_menu::Node], out: &mut Vec<String>) {
         for n in nodes {
             match n {
@@ -878,7 +878,7 @@ const KEEPS_MENU_NAMES: [&str; 18] = ["cs", "de", "el", "es", "fr", "hu", "it", 
 /// names and the perspective grid presets (names, shown untranslated wherever else they appear).
 /// Each language's own name in the Language menu is left alone too.
 const MENU_KEEP_AS_IS: &[&str] = &[
-    "VectorCraft",
+    "AI-Corel",
     "OpenType",
     "Essentials",
     "Essentials Classic",
@@ -1275,7 +1275,9 @@ fn cyrillic_glyphs_are_available_without_system_fonts() {
 /// the `interfaceLanguage` preference, and isn't written back.
 #[test]
 fn a_language_saved_by_an_older_version_carries_over() {
-    for (saved, want) in [("ja", "ja"), ("cs", "cs"), ("pt-br", "pt-br"), ("en", "auto"), ("xx", "auto")] {
+    // English (the old default) and unknown codes leave the preference at the shipped default.
+    let default = vectorcraft_engine::Prefs::default().interface_language;
+    for (saved, want) in [("ja", "ja"), ("cs", "cs"), ("pt-br", "pt-br"), ("en", default.as_str()), ("xx", default.as_str())] {
         let ui: crate::state::UiState = serde_json::from_value(serde_json::json!({"language": saved})).unwrap();
         let mut app = crate::VectorcraftApp::new(vectorcraft_engine::Session::new(), crate::Services::default());
         app.ui = ui;

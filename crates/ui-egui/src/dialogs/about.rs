@@ -1,4 +1,4 @@
-//! Help → About VectorCraft.
+//! Help → About AI-Corel.
 
 use crate::VectorcraftApp;
 use crate::theme;
@@ -9,7 +9,7 @@ pub(super) fn show(app: &mut VectorcraftApp, ctx: &egui::Context) {
         return;
     }
     let mut open = true;
-    egui::Window::new(tl!("About VectorCraft"))
+    egui::Window::new(tl!("About AI-Corel"))
         .collapsible(false)
         .resizable(false)
         .open(&mut open)
@@ -45,14 +45,15 @@ pub(super) fn show(app: &mut VectorcraftApp, ctx: &egui::Context) {
     app.ui.about = open;
 }
 
-/// The About tab: mark, version, community links, licences and the GPU in use.
+/// The About tab: mark, version, licences and the GPU in use. No outside links: AI-Corel works
+/// offline, from its folder on the user's server.
 fn about_tab(app: &mut VectorcraftApp, ui: &mut egui::Ui) {
     ui.set_width(380.0);
     ui.horizontal(|ui| {
         let (r, _) = ui.allocate_exact_size(egui::vec2(44.0, 44.0), egui::Sense::hover());
         crate::brand::paint_mark(ui, r);
         ui.vertical(|ui| {
-            ui.label(egui::RichText::new("VectorCraft").font(theme::semibold(22.0)));
+            ui.label(egui::RichText::new(crate::native_menu::APP_NAME).font(theme::semibold(22.0)));
             ui.label(crate::i18n::fmt(
                 tl!("Version {version} — open-source vector illustration in pure Rust."),
                 &[("version", env!("CARGO_PKG_VERSION"))],
@@ -60,14 +61,7 @@ fn about_tab(app: &mut VectorcraftApp, ui: &mut egui::Ui) {
         });
     });
     ui.add_space(12.0);
-    crate::community::links(app, ui);
-    ui.add_space(12.0);
-    ui.label(
-        egui::RichText::new(tl!(
-            "Part of ArtCraft. MIT OR Apache-2.0. Fonts: Source Sans 3, Inter, JetBrains Mono (OFL). Icons: Lucide (ISC) + VectorCraft."
-        ))
-        .size(11.0),
-    );
+    ui.label(egui::RichText::new(tl!("MIT OR Apache-2.0. Fonts: Source Sans 3, Inter, JetBrains Mono (OFL). Icons: Lucide (ISC).")).size(11.0));
     // The GPU the window renders with, for bug reports (Preferences › Performance picks it).
     if let Some(adapter) = &app.graphics_adapter {
         ui.add_space(6.0);

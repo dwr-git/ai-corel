@@ -497,6 +497,12 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
     ),
     ("window.brightness", "UI Brightness", "", "{brightness: dark|mediumDark|mediumLight|light}"),
     (
+        "window.theme",
+        "Theme",
+        "",
+        "{theme: neuLight|neuDark|brand|modern|classic} the interface look: Neumorphic Light or Dark, Brand (glass over the brand gradient), or the Modern / Classic colour scheme at the current brightness; persisted as the uiColorScheme and uiBrightness preferences",
+    ),
+    (
         "window.workspace",
         "Workspace",
         "",
@@ -547,9 +553,9 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
         "",
         "{} opens the Save PDF dialog; with params = document.exportPdf options written to path (asked when missing; viewAfterSaving opens the file) → {path, bytes, warnings}",
     ),
-    ("help.about", "About VectorCraft", "", "{}"),
+    ("help.about", "About AI-Corel", "", "{}"),
     ("help.commandPalette", "Search Commands…", "Cmd+Shift+/", "{}"),
-    ("app.quit", "Quit VectorCraft", "Cmd+Q", "{}"),
+    ("app.quit", "Quit AI-Corel", "Cmd+Q", "{}"),
     (
         "ui.swatchOptions",
         "Swatch Options…",
@@ -1672,6 +1678,23 @@ pub fn run_ui_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<R
                 (None, _) => Err(format!("unknown panel `{raw}`")),
             }
         }
+        "window.theme" => {
+            let (scheme, brightness) = match s("theme").as_deref() {
+                Some("neuLight") => ("neumorphic", Some(Brightness::Light)),
+                Some("neuDark") => ("neumorphic", Some(Brightness::Dark)),
+                Some("brand") => ("brand", Some(Brightness::Dark)),
+                Some("modern") => ("modern", None),
+                Some("classic") => ("classic", None),
+                _ => return Some(Err("theme must be neuLight|neuDark|brand|modern|classic".into())),
+            };
+            app.session.prefs.ui_color_scheme = scheme.into();
+            if let Some(b) = brightness {
+                app.ui.brightness = b;
+                app.session.prefs.ui_brightness = b.id().into();
+            }
+            app.canvas.key = None;
+            Ok(json!(s("theme")))
+        }
         "window.brightness" => match s("brightness").as_deref().and_then(Brightness::parse) {
             Some(b) => {
                 app.ui.brightness = b;
@@ -2046,6 +2069,16 @@ pub fn checked(app: &VectorcraftApp, id: &str, p: &Value) -> Option<bool> {
         "window.collapseDock" => app.ui.dock_collapsed,
         "window.workspace" => p.get("name").and_then(Value::as_str) == Some(app.ui.workspace.as_str()),
         "window.brightness" => p.get("brightness").and_then(Value::as_str).and_then(Brightness::parse) == Some(app.ui.brightness),
+        "window.theme" => {
+            let prefs = &app.session.prefs;
+            let dark = matches!(app.ui.brightness, Brightness::Dark | Brightness::MediumDark);
+            match p.get("theme").and_then(Value::as_str) {
+                Some("neuLight") => prefs.ui_color_scheme == "neumorphic" && !dark,
+                Some("neuDark") => prefs.ui_color_scheme == "neumorphic" && dark,
+                Some(other) => prefs.ui_color_scheme == other,
+                None => false,
+            }
+        }
         "view.slices.lock" => app.session.slices_locked(),
         "object.slice.clipToArtboard" => app.session.active().is_some_and(|d| d.doc.slices_clip_to_artboard),
         "view.proofColors" => vectorcraft_render::proof::view().proof_colors,
@@ -2611,8 +2644,8 @@ pub fn menu_tree_named(english_names: bool) -> Vec<(&'static str, Vec<Item>)> {
             // App menu from this entry and the other menus (About from Help, Settings from Edit,
             // Quit from File, Language and Appearance synthesized). It stays first: `from_tree`
             // gives the first menu the App role.
-            "VectorCraft",
-            vec![c("About VectorCraft", "help.about"), c("Join Our Discord", "help.discord")],
+            "AI-Corel",
+            vec![c("About AI-Corel", "help.about")],
         ),
         (
             "File",
@@ -3197,6 +3230,17 @@ pub fn menu_tree_named(english_names: bool) -> Vec<(&'static str, Vec<Item>)> {
                 c("New Window", "window.newWindow"),
                 sub("Arrange", vec![todo("Cascade"), todo("Tile"), todo("Float in Window"), todo("Consolidate All Windows")]),
                 sub("Workspace", crate::workspaces::menu_items()),
+                sub(
+                    "Theme",
+                    vec![
+                        cp("Neumorphic Light", "window.theme", json!({"theme": "neuLight"})),
+                        cp("Neumorphic Dark", "window.theme", json!({"theme": "neuDark"})),
+                        cp("Brand", "window.theme", json!({"theme": "brand"})),
+                        Sep,
+                        cp("Modern", "window.theme", json!({"theme": "modern"})),
+                        cp("Classic", "window.theme", json!({"theme": "classic"})),
+                    ],
+                ),
                 Sep,
                 c("Control", "window.control"),
                 c("Contextual Task Bar", "window.taskBar"),
@@ -3257,20 +3301,7 @@ pub fn menu_tree_named(english_names: bool) -> Vec<(&'static str, Vec<Item>)> {
                 sub("Symbol Libraries", crate::panels::symbols::window_menu()),
             ],
         ),
-        (
-            "Help",
-            vec![
-                c("Join Our Discord", "help.discord"),
-                c("ArtCraft Website", "help.website"),
-                c("VectorCraft on getartcraft.com", "help.appPage"),
-                c("VectorCraft on GitHub", "help.github"),
-                Sep,
-                c("Search Commands…", "help.commandPalette"),
-                todos("VectorCraft Help…", "F1"),
-                Sep,
-                c("About VectorCraft", "help.about"),
-            ],
-        ),
+        ("Help", vec![c("Search Commands…", "help.commandPalette"), Sep, c("About AI-Corel", "help.about")]),
     ]
 }
 
@@ -3472,7 +3503,7 @@ pub fn menu_bar(app: &mut VectorcraftApp, ui: &mut egui::Ui) -> f32 {
     let tree = menu_tree_named(app.session.prefs.font_names_in_english);
     // No application menu in the window (as in Illustrator): the bar starts at File on every
     // platform. The VectorCraft menu stays in the tree: the native Mac bar takes it from there.
-    let tree: Vec<(&str, Vec<Item>)> = tree.into_iter().filter(|(title, _)| *title != "VectorCraft").collect();
+    let tree: Vec<(&str, Vec<Item>)> = tree.into_iter().filter(|(title, _)| *title != "AI-Corel").collect();
     let (end, open) = egui::MenuBar::new()
         .ui(ui, |ui| {
             let mut titles = Vec::with_capacity(tree.len());
@@ -3863,11 +3894,6 @@ pub fn invoke(app: &mut VectorcraftApp, id: &str, p: Value) {
         if let Err(e) = crate::dialogs::expand::open(app) {
             app.status(e);
         }
-        return;
-    }
-    // Help links: the command returns the URL; a menu click opens it (agents just get the URL).
-    if matches!(id, "help.discord" | "help.website" | "help.appPage" | "help.github") {
-        app.open_link(id);
         return;
     }
     // Object → Align aligns to what the align buttons align to, unless the call names `to`. With
@@ -4395,7 +4421,7 @@ mod tests {
         for t in titles {
             assert!(shown.iter().any(|s| s == t), "{t} missing from {shown:?}");
         }
-        assert!(!shown.iter().any(|s| s == "VectorCraft"), "{shown:?}");
+        assert!(!shown.iter().any(|s| s == "AI-Corel"), "{shown:?}");
     }
 
     #[test]

@@ -453,7 +453,7 @@ pub fn floating_panel(app: &mut VectorcraftApp, ctx: &egui::Context) {
     let mut torn = None;
     let area = egui::Area::new(egui::Id::new("icon-panel")).order(egui::Order::Foreground).pivot(egui::Align2::RIGHT_TOP);
     area.fixed_pos(egui::pos2(right, FLYOUT_TOP)).show(ctx, |ui| {
-        egui::Frame::popup(ui.style()).fill(t.panel).corner_radius(CornerRadius::same(4)).inner_margin(egui::Margin::ZERO).show(ui, |ui| {
+        egui::Frame::popup(ui.style()).fill(t.float_fill()).corner_radius(CornerRadius::same(4)).inner_margin(egui::Margin::ZERO).show(ui, |ui| {
             ui.set_width(width);
             let (strip, _) = ui.allocate_exact_size(vec2(width, 26.0), Sense::hover());
             ui.painter().rect_filled(strip, CornerRadius { nw: 4, ne: 4, sw: 0, se: 0 }, t.panel_darker);

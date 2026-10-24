@@ -20,8 +20,8 @@ const MARK: f32 = 18.0;
 /// Height of the workspace switcher.
 const WIDGET_H: f32 = 22.0;
 
-/// The application bar: brand mark, Home, menus, then Discord, search and the workspace switcher
-/// at the right. With [`VectorcraftApp::custom_titlebar`] it is also the window's title bar
+/// The application bar: brand mark, Home, menus, then search, the workspace switcher and (web) the
+/// way back to the site at the right. With [`VectorcraftApp::custom_titlebar`] it is also the window's title bar
 /// ([`titlebar`]): the caption buttons take the right end and the rest of the bar drags the window.
 /// On macOS, under the system's transparent title bar, its empty space drags and zooms the window
 /// too ([`titlebar::drag_area`]). With the system title bar (Windows and Linux, `system_title_bar`) the OS draws its own icon and
@@ -69,9 +69,17 @@ pub fn app_bar(app: &mut VectorcraftApp, ui: &mut Ui) {
             let icon = 28.0;
             let search = room >= 64.0 + 8.0 + gap + icon;
             let ws_w = ws_w.min(room - 8.0 - gap - if search { icon } else { 0.0 }).max(64.0);
-            let discord = search && room >= ws_w + 8.0 + gap + icon + 10.0 + gap + crate::community::discord_width(ui, false);
             let mut rui = ui.new_child(egui::UiBuilder::new().max_rect(right).layout(egui::Layout::right_to_left(egui::Align::Center)));
             let ui = &mut rui;
+            // The way back to the site the editor lives on (web): the far right.
+            if app.services.go_home.is_some() {
+                if widgets::icon_button(ui, "log-out", tl!("To the site"), false, icon).clicked()
+                    && let Some(go) = app.services.go_home.as_mut()
+                {
+                    go();
+                }
+                ui.add_space(6.0);
+            }
             // Workspace switcher: shows the current workspace, opens Window → Workspace.
             let (wr, wresp) = ui.allocate_exact_size(vec2(ws_w, WIDGET_H), Sense::click());
             ui.painter().rect_filled(wr, CornerRadius::same(4), if wresp.hovered() { t.hover } else { t.panel });
@@ -91,12 +99,8 @@ pub fn app_bar(app: &mut VectorcraftApp, ui: &mut Ui) {
                     app.ui.palette_query.clear();
                 }
             }
-            if discord {
-                ui.add_space(10.0);
-                crate::community::discord_button(app, ui, false);
-            }
             if app.services.native_menu.is_some() {
-                let title = ui.painter().layout_no_wrap("VectorCraft".into(), egui::FontId::proportional(13.5), t.text);
+                let title = ui.painter().layout_no_wrap(crate::native_menu::APP_NAME.into(), egui::FontId::proportional(13.5), t.text);
                 let title_rect = egui::Rect::from_center_size(full.center(), title.size());
                 // Keep the title centered only while the interactive groups leave room for it.
                 if title_rect.left() >= menus_end + 8.0 && title_rect.right() <= ui.min_rect().left() - 8.0 {
@@ -125,8 +129,8 @@ pub fn system_title_bar(app: &VectorcraftApp) -> bool {
 pub fn window_title(app: &VectorcraftApp) -> String {
     app.session
         .active()
-        .map(|d| format!("{}{} \u{2014} VectorCraft", if d.is_dirty() { "*" } else { "" }, d.title()))
-        .unwrap_or_else(|| "VectorCraft".into())
+        .map(|d| format!("{}{} \u{2014} {}", if d.is_dirty() { "*" } else { "" }, d.title(), crate::native_menu::APP_NAME))
+        .unwrap_or_else(|| crate::native_menu::APP_NAME.into())
 }
 
 /// Keep the OS window title (and the taskbar / Alt-Tab entry) on the active file. Sends
@@ -2169,17 +2173,17 @@ mod tests {
 
     #[test]
     fn window_title_with_no_document_is_the_app_name() {
-        assert_eq!(super::window_title(&title_test_app(true)), "VectorCraft");
+        assert_eq!(super::window_title(&title_test_app(true)), "AI-Corel");
     }
 
     #[test]
     fn window_title_follows_the_active_file() {
         let mut app = title_test_app(true);
         app.run("file.new", json!({"width": 100, "height": 100, "name": "foo.svg"})).unwrap();
-        assert_eq!(super::window_title(&app), "foo.svg \u{2014} VectorCraft");
+        assert_eq!(super::window_title(&app), "foo.svg \u{2014} AI-Corel");
         // Unsaved changes gain a `*` prefix, like the `*` in the document tabs.
         app.run("shape.rectangle", json!({"x": 0, "y": 0, "width": 10, "height": 10})).unwrap();
-        assert_eq!(super::window_title(&app), "*foo.svg \u{2014} VectorCraft");
+        assert_eq!(super::window_title(&app), "*foo.svg \u{2014} AI-Corel");
     }
 
     #[test]
@@ -2213,11 +2217,11 @@ mod tests {
         let ctx = egui::Context::default();
         crate::theme::install_fonts(&ctx);
         super::sync_window_title(&mut app, &ctx);
-        assert_eq!(app.last_window_title, "VectorCraft");
+        assert_eq!(app.last_window_title, "AI-Corel");
         let mut out = ctx.run_ui(egui::RawInput::default(), |_| {});
         out.textures_delta.clear();
         let cmds = out.viewport_output.remove(&egui::ViewportId::ROOT).map(|v| v.commands).unwrap_or_default();
-        assert!(cmds.iter().any(|c| matches!(c, egui::ViewportCommand::Title(t) if t == "VectorCraft")), "{cmds:?}");
+        assert!(cmds.iter().any(|c| matches!(c, egui::ViewportCommand::Title(t) if t == "AI-Corel")), "{cmds:?}");
         // Same document state again: the cached title stops a repeat command.
         super::sync_window_title(&mut app, &ctx);
         let mut out = ctx.run_ui(egui::RawInput::default(), |_| {});
@@ -2226,7 +2230,7 @@ mod tests {
         assert!(!cmds.iter().any(|c| matches!(c, egui::ViewportCommand::Title(_))), "repeat Title: {cmds:?}");
         app.run("file.new", json!({"width": 100, "height": 100, "name": "foo.svg"})).unwrap();
         super::sync_window_title(&mut app, &ctx);
-        assert_eq!(app.last_window_title, "foo.svg \u{2014} VectorCraft");
+        assert_eq!(app.last_window_title, "foo.svg \u{2014} AI-Corel");
     }
     /// Draw actual tabs, including the same per-frame view synchronization as the app.
     fn artboard_document_tabs_frame(app: &mut crate::VectorcraftApp, ctx: &egui::Context, events: Vec<egui::Event>) -> Vec<egui::Rect> {
@@ -2642,12 +2646,12 @@ mod visual_regressions {
                             _ => None,
                         })
                         .collect();
-                    let title = texts.iter().find(|text| text.galley.job.text == "VectorCraft");
+                    let title = texts.iter().find(|text| text.galley.job.text == "AI-Corel");
                     if width >= 1280.0 {
                         assert!(title.is_some(), "the title remains visible when the header has room");
                     }
                     if let Some(title) = title {
-                        for text in texts.iter().filter(|text| text.galley.job.text != "VectorCraft") {
+                        for text in texts.iter().filter(|text| text.galley.job.text != "AI-Corel") {
                             assert!(
                                 !title.visual_bounding_rect().intersects(text.visual_bounding_rect()),
                                 "{width}: title overlaps {:?}",

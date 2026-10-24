@@ -18,7 +18,6 @@ mod brand;
 pub mod canvas;
 pub mod chrome;
 mod clipboard_probe;
-pub mod community;
 pub mod control;
 pub mod credits;
 pub mod cursors;
@@ -327,6 +326,9 @@ pub struct Services {
     /// and the end to switch to the Eraser tool and back. Without it, pen pressure comes from
     /// touch events only ([`stylus`]).
     pub stylus: Option<stylus::StylusFeed>,
+    /// Web: leave the editor for the site it lives on (the title bar's button at the far right):
+    /// AI-Corel is a folder on the user's server, and this goes one level up.
+    pub go_home: Option<Box<dyn FnMut()>>,
 }
 
 /// Cached canvas raster.
@@ -591,6 +593,12 @@ impl VectorcraftApp {
         // The place cursor's clicks and drags place their files through the app
         // ([`place::place_from_cursor`]).
         session.place_cursor_requests = true;
+        // AI-Corel ships in Russian; unit tests drive the UI by its English labels (see
+        // `i18n::system_lang`), so the shipped default reads as `auto` there.
+        #[cfg(test)]
+        if session.prefs.interface_language == vectorcraft_engine::Prefs::default().interface_language {
+            session.prefs.interface_language = "auto".into();
+        }
         let views = session.documents().iter().map(View::of).collect();
         Self {
             session,
@@ -1596,6 +1604,8 @@ impl VectorcraftApp {
         floating::track(self, &ctx);
         // A selection move released over a panel ends before any panel sees the release (#2826).
         canvas::release_over_panel(self, &ctx);
+        // Brand: the gradient behind every (glass) panel.
+        theme::paint_backdrop(&ctx);
         let t = theme::Tokens::get(&ctx);
         if self.ui.screen_mode < 2 {
             chrome::app_bar(self, ui);

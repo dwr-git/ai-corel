@@ -66,9 +66,10 @@ pub fn restore(app: &mut VectorcraftApp) {
         p.ui_brightness = app.ui.brightness.id().into();
     }
     // Older preference files kept the interface language with the UI state; English was the
-    // default there, so only another language is carried over (onto an unset preference).
+    // default there, so only another language is carried over (onto an unset preference, which
+    // reads as the shipped default).
     if let Some(code) = app.ui.legacy_language.take()
-        && p.interface_language == "auto"
+        && (p.interface_language == "auto" || p.interface_language == Prefs::default().interface_language)
         && code != "en"
         && crate::i18n::Lang::from_code(&code).is_some()
     {
@@ -555,7 +556,7 @@ mod tests {
         a.ui.dialog.as_mut().unwrap().fields.insert("anchorSize".into(), json!(42));
         assert!(confirm(&mut a).is_err());
         assert!(a.ui.dialog.is_some());
-        assert_eq!(a.session.prefs, Prefs::default());
+        assert_eq!(a.session.prefs, app().session.prefs);
     }
 
     #[test]

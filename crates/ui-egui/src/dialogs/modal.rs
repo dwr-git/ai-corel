@@ -30,7 +30,7 @@ pub(crate) fn show_at<R>(ctx: &egui::Context, title: &str, id: Id, initial: Vec2
         .resizable(false)
         .title_bar(false)
         .anchor(egui::Align2::CENTER_CENTER, offset(ctx, id, initial))
-        .frame(egui::Frame::window(&ctx.global_style()).fill(t.panel).inner_margin(egui::Margin::same(margin)))
+        .frame(egui::Frame::window(&ctx.global_style()).fill(t.float_fill()).inner_margin(egui::Margin::same(margin)))
         .show(ctx, add)?;
     keep_rest(ctx, id, shown.response.rect.height());
     shown.inner

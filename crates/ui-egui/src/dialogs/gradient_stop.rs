@@ -107,7 +107,7 @@ fn show(app: &mut VectorcraftApp, ctx: &egui::Context) {
         .fixed_pos(pos)
         .constrain(true)
         .show(ctx, |ui| {
-            egui::Frame::popup(&ctx.global_style()).fill(t.panel).inner_margin(egui::Margin::same(10)).show(ui, |ui| {
+            egui::Frame::popup(&ctx.global_style()).fill(t.float_fill()).inner_margin(egui::Margin::same(10)).show(ui, |ui| {
                 ui.set_width(250.0);
                 ui.horizontal(|ui| {
                     for (icon, tip, on) in [("palette", tl!("Color"), !swatches), ("swatch-book", tl!("Swatches"), swatches)] {

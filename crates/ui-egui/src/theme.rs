@@ -8,9 +8,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Brightness {
     Dark,
-    #[default]
     MediumDark,
     MediumLight,
+    /// AI-Corel opens light (with the Neumorphic scheme: the soft light-blue look).
+    #[default]
     Light,
 }
 
@@ -85,20 +86,25 @@ impl Accent {
     }
 }
 
-/// User Interface › Color Scheme: Modern (the default: slate greys and the chosen accent) or
-/// Classic (the neutral greys and blue accent of earlier versions). Both keep the same layout,
-/// cards and corners; only the colours differ.
+/// User Interface › Color Scheme: Neumorphic (AI-Corel's default: one soft, cool surface that
+/// panels and controls are raised from or pressed into), Brand (glass panels over the brand
+/// gradient, solid black floating windows), Modern (slate greys and the chosen accent) or Classic
+/// (the neutral greys and blue accent of earlier versions).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Scheme {
     #[default]
+    Neumorphic,
+    Brand,
     Modern,
     Classic,
 }
 
 impl Scheme {
-    pub const ALL: [Scheme; 2] = [Scheme::Modern, Scheme::Classic];
+    pub const ALL: [Scheme; 4] = [Scheme::Neumorphic, Scheme::Brand, Scheme::Modern, Scheme::Classic];
     pub fn id(self) -> &'static str {
         match self {
+            Scheme::Neumorphic => "neumorphic",
+            Scheme::Brand => "brand",
             Scheme::Modern => "modern",
             Scheme::Classic => "classic",
         }
@@ -167,6 +173,12 @@ pub struct Tokens {
     pub axis_x: Color32,
     pub axis_y: Color32,
     pub axis_z: Color32,
+    /// Neumorphic: panels and controls are raised from or pressed into the surface with paired
+    /// soft shadows ([`Tokens::neu_shadows`]) instead of borders.
+    pub neu: bool,
+    /// Brand: glass panels over the painted backdrop ([`paint_backdrop`]); floating windows are
+    /// solid black.
+    pub brand: bool,
 }
 
 impl Tokens {
@@ -218,6 +230,8 @@ impl Tokens {
             axis_x: hex(0xef6058),
             axis_y: hex(0x45af63),
             axis_z: hex(0x378ef0),
+            neu: false,
+            brand: false,
         };
         match b {
             Brightness::Dark => base,
@@ -422,11 +436,153 @@ impl Tokens {
         }
     }
 
-    /// The tokens for `b` in `scheme`; Modern takes `accent`, Classic has its own blue.
+    /// The Neumorphic scheme: one soft, cool surface (light blue for the light brightnesses, deep
+    /// slate for the dark ones) with a calm blue accent.
+    pub fn neumorphic(b: Brightness) -> Self {
+        let rgb = Color32::from_rgb;
+        let dark = matches!(b, Brightness::Dark | Brightness::MediumDark);
+        let base = Tokens::for_brightness(if dark { Brightness::Dark } else { Brightness::Light });
+        if dark {
+            Tokens {
+                app_bar: rgb(38, 45, 58),
+                panel: rgb(42, 50, 64),
+                panel_darker: rgb(35, 42, 54),
+                tab_strip: rgb(38, 45, 58),
+                input: rgb(31, 37, 48),
+                input_border: rgb(62, 72, 90),
+                border: rgb(26, 31, 40),
+                divider: rgb(52, 61, 77),
+                text: rgb(222, 229, 240),
+                text_strong: Color32::WHITE,
+                text_dim: rgb(150, 162, 182),
+                text_disabled: rgb(96, 108, 128),
+                icon: rgb(204, 213, 228),
+                hover: rgb(50, 59, 75),
+                tool_active: rgb(31, 37, 48),
+                accent: rgb(92, 168, 255),
+                accent_strong: rgb(52, 128, 226),
+                flyout_active: rgb(92, 168, 255),
+                row_selected: rgb(44, 70, 104),
+                pasteboard: rgb(33, 39, 51),
+                ruler: rgb(38, 45, 58),
+                ruler_tick: rgb(126, 138, 158),
+                measure_bg: Color32::from_rgba_unmultiplied(42, 50, 64, 235),
+                button: rgb(42, 50, 64),
+                button_border: rgb(90, 102, 124),
+                radius: 8,
+                neu: true,
+                ..base
+            }
+        } else {
+            Tokens {
+                app_bar: rgb(228, 236, 246),
+                panel: rgb(230, 238, 248),
+                panel_darker: rgb(221, 230, 242),
+                tab_strip: rgb(228, 236, 246),
+                input: rgb(219, 228, 241),
+                input_border: rgb(190, 203, 221),
+                border: rgb(205, 216, 231),
+                divider: rgb(210, 220, 234),
+                text: rgb(40, 52, 72),
+                text_strong: rgb(16, 24, 40),
+                text_dim: rgb(90, 104, 126),
+                text_disabled: rgb(150, 162, 180),
+                icon: rgb(52, 66, 88),
+                hover: rgb(238, 244, 252),
+                tool_active: rgb(216, 226, 240),
+                accent: rgb(52, 128, 226),
+                accent_strong: rgb(40, 112, 212),
+                flyout_active: rgb(40, 112, 212),
+                row_selected: rgb(205, 223, 247),
+                pasteboard: rgb(216, 226, 239),
+                ruler: rgb(224, 232, 243),
+                ruler_tick: rgb(106, 120, 142),
+                measure_bg: Color32::from_rgba_unmultiplied(230, 238, 248, 235),
+                button: rgb(230, 238, 248),
+                button_border: rgb(170, 186, 208),
+                radius: 8,
+                neu: true,
+                ..base
+            }
+        }
+    }
+
+    /// The Brand scheme: glass panels (translucent white) over the brand gradient painted on the
+    /// background layer, solid black menus and windows, a soft violet-blue accent. Always dark.
+    pub fn brand() -> Self {
+        let rgb = Color32::from_rgb;
+        let glass = Color32::from_white_alpha;
+        Tokens {
+            app_bar: Color32::TRANSPARENT,
+            panel: glass(26),
+            panel_darker: glass(16),
+            tab_strip: glass(12),
+            input: Color32::from_rgba_unmultiplied(22, 22, 39, 215),
+            input_border: glass(44),
+            border: glass(24),
+            divider: glass(30),
+            text: rgb(238, 238, 255),
+            text_strong: Color32::WHITE,
+            text_dim: rgb(176, 180, 214),
+            text_disabled: rgb(112, 116, 150),
+            icon: rgb(222, 224, 246),
+            hover: glass(34),
+            tool_active: Color32::from_rgba_unmultiplied(102, 126, 234, 150),
+            accent: rgb(150, 164, 255),
+            accent_strong: rgb(108, 105, 204),
+            flyout_active: rgb(172, 184, 255),
+            row_selected: Color32::from_rgba_unmultiplied(102, 126, 234, 110),
+            pasteboard: Color32::TRANSPARENT,
+            ruler: glass(12),
+            ruler_tick: rgb(170, 174, 210),
+            measure_bg: Color32::from_black_alpha(235),
+            button: glass(26),
+            button_border: glass(96),
+            radius: 8,
+            brand: true,
+            ..Tokens::for_brightness(Brightness::Dark)
+        }
+    }
+
+    /// The tokens for `b` in `scheme`; Modern takes `accent`, the others have their own.
     pub fn for_scheme(scheme: Scheme, b: Brightness, accent: Accent) -> Self {
         match scheme {
+            Scheme::Neumorphic => Self::neumorphic(b),
+            Scheme::Brand => Self::brand(),
             Scheme::Modern => Self::for_brightness(b).with_accent(accent),
             Scheme::Classic => Self::classic(b),
+        }
+    }
+
+    /// The theme's id for the web page (`window.vectorcraft.currentTheme()`): `neuLight`,
+    /// `neuDark` and `brand` for AI-Corel's own looks, else `modern-dark`, `classic-light`, ….
+    pub fn theme_id(&self) -> &'static str {
+        match (self.brand, self.neu, self.dark) {
+            (true, _, _) => "brand",
+            (_, true, true) => "neuDark",
+            (_, true, false) => "neuLight",
+            (_, _, true) => "dark",
+            (_, _, false) => "light",
+        }
+    }
+
+    /// The fill of floating windows and popups: solid black in Brand, else the panel colour.
+    pub fn float_fill(&self) -> Color32 {
+        if self.brand { Color32::BLACK } else { self.panel }
+    }
+
+    /// The outline of floating windows: a faint edge on Brand's black, else the border colour.
+    pub fn float_border(&self) -> Color32 {
+        if self.brand { Color32::from_white_alpha(22) } else { self.border }
+    }
+
+    /// The Neumorphic shadow pair `(light, dark)`: the light one falls up and to the left of a
+    /// raised shape, the dark one down and to the right (reversed inside a pressed one).
+    pub fn neu_shadows(&self) -> (Color32, Color32) {
+        if self.dark {
+            (Color32::from_rgba_unmultiplied(66, 77, 96, 150), Color32::from_rgba_unmultiplied(10, 13, 20, 210))
+        } else {
+            (Color32::from_rgba_unmultiplied(255, 255, 255, 240), Color32::from_rgba_unmultiplied(140, 160, 190, 190))
         }
     }
 
@@ -465,16 +621,133 @@ pub fn card<R>(ui: &mut egui::Ui, t: &Tokens, margin: egui::Margin, body: impl F
         .fill(t.app_bar)
         .inner_margin(margin)
         .show(ui, |ui| {
-            egui::Frame::NONE
-                .fill(t.panel)
-                .corner_radius(CARD_RADIUS)
-                .show(ui, |ui| {
-                    ui.set_min_size(ui.available_size());
-                    body(ui)
-                })
-                .inner
+            // Neumorphic cards rise out of the surface: their soft shadows are painted behind them,
+            // into the frame's margin (a slot reserved now, filled once the card's size is known).
+            let shadow = t.neu.then(|| ui.painter().add(egui::Shape::Noop));
+            let inner = egui::Frame::NONE.fill(t.panel).corner_radius(CARD_RADIUS).show(ui, |ui| {
+                ui.set_min_size(ui.available_size());
+                body(ui)
+            });
+            if let Some(slot) = shadow {
+                let rect = inner.response.rect;
+                let painter = ui.painter().clone().with_clip_rect(rect.expand(NEU_CARD_DEPTH * 2.5));
+                painter.set(slot, neu_raised_shape(rect, CARD_RADIUS, NEU_CARD_DEPTH, t));
+            }
+            inner.inner
         })
         .inner
+}
+
+/// How far Neumorphic cards rise out of the surface, in points.
+pub const NEU_CARD_DEPTH: f32 = 3.5;
+
+/// The paired soft shadows of a Neumorphic shape raised `depth` points out of the surface: the
+/// light shadow up and to the left, the dark one down and to the right. Paint it behind the
+/// shape's own fill.
+pub fn neu_raised_shape(rect: egui::Rect, radius: impl Into<CornerRadius> + Copy, depth: f32, t: &Tokens) -> egui::Shape {
+    let (light, dark) = t.neu_shadows();
+    let d = depth.round().clamp(1.0, 24.0) as i8;
+    let blur = (depth * 2.6).round().clamp(2.0, 60.0) as u8;
+    egui::Shape::Vec(vec![
+        egui::Shadow { offset: [-d, -d], blur, spread: 0, color: light }.as_shape(rect, radius).into(),
+        egui::Shadow { offset: [d, d], blur, spread: 0, color: dark }.as_shape(rect, radius).into(),
+    ])
+}
+
+/// The inner shading of a Neumorphic shape pressed into the surface (egui has no inset shadow):
+/// fading bands of the dark shadow along the inside top and left edges and of the light one along
+/// the bottom and right, clipped to the shape.
+pub fn neu_pressed(painter: &egui::Painter, rect: egui::Rect, radius: f32, t: &Tokens) {
+    let (light, dark) = t.neu_shadows();
+    let clip = rect.intersect(painter.clip_rect());
+    if !clip.is_positive() {
+        return;
+    }
+    let p = painter.clone().with_clip_rect(clip);
+    for (i, strength) in [0.85_f32, 0.5, 0.22].into_iter().enumerate() {
+        let o = 1.0 + i as f32;
+        let w = Stroke::new(1.6, dark.gamma_multiply(strength));
+        p.rect_stroke(rect.translate(egui::vec2(o, o)).expand(1.0), radius, w, egui::StrokeKind::Outside);
+        let w = Stroke::new(1.6, light.gamma_multiply(strength * 0.9));
+        p.rect_stroke(rect.translate(egui::vec2(-o, -o)).expand(1.0), radius, w, egui::StrokeKind::Outside);
+    }
+}
+
+/// Where the Brand backdrop is laid out when the window is not the whole page: the page's
+/// viewport in the app's screen points. The web shell sets it, so the backdrop lines up with the
+/// same CSS gradient around the canvas.
+pub const BACKDROP_FRAME: &str = "ai-corel-backdrop-frame";
+
+/// The Brand backdrop, behind every panel: on a 135° linear gradient #0a0a0f → #1a1a2e → #16213e,
+/// three soft radial spots (40%/40% cyan, 80%/20% pink, 20%/80% violet, each fading to nothing at
+/// half the distance to the farthest corner), laid out over the viewport like CSS
+/// `background-attachment: fixed`. Evaluated on a vertex grid; the colours change slowly, so
+/// linear interpolation between vertices matches the CSS gradient.
+pub fn paint_backdrop(ctx: &egui::Context) {
+    if !Tokens::get(ctx).brand {
+        return;
+    }
+    let screen = ctx.content_rect();
+    if !screen.is_positive() {
+        return;
+    }
+    let frame = ctx
+        .data(|d| d.get_temp::<egui::Rect>(egui::Id::new(BACKDROP_FRAME)))
+        .filter(|f| f.is_positive() && f.width().is_finite() && f.height().is_finite())
+        .unwrap_or(screen);
+    const NX: usize = 48;
+    const NY: usize = 30;
+    let mut mesh = egui::Mesh::default();
+    for j in 0..=NY {
+        for i in 0..=NX {
+            let p = egui::pos2(
+                egui::lerp(screen.left()..=screen.right(), i as f32 / NX as f32),
+                egui::lerp(screen.top()..=screen.bottom(), j as f32 / NY as f32),
+            );
+            mesh.colored_vertex(p, backdrop_color(p - frame.min, frame.size()));
+        }
+    }
+    let row = (NX + 1) as u32;
+    for j in 0..NY as u32 {
+        for i in 0..NX as u32 {
+            let a = j * row + i;
+            mesh.add_triangle(a, a + 1, a + row + 1);
+            mesh.add_triangle(a, a + row + 1, a + row);
+        }
+    }
+    ctx.layer_painter(egui::LayerId::background()).add(mesh);
+}
+
+/// The backdrop's colour at `p`, an offset inside a viewport of `size` (sRGB, like CSS).
+pub fn backdrop_color(p: egui::Vec2, size: egui::Vec2) -> Color32 {
+    let (w, h) = (size.x.max(1.0), size.y.max(1.0));
+    // linear-gradient(135deg, …): towards the bottom right, over |w sin θ| + |h cos θ|.
+    let (s, c) = (std::f32::consts::FRAC_1_SQRT_2, -std::f32::consts::FRAC_1_SQRT_2);
+    let len = (w * s).abs() + (h * c).abs();
+    let t = (((p.x - w / 2.0) * s + (p.y - h / 2.0) * -c) / len + 0.5).clamp(0.0, 1.0);
+    let stops = [(0.0, [10.0, 10.0, 15.0]), (0.5, [26.0, 26.0, 46.0]), (1.0, [22.0, 33.0, 62.0])];
+    let mut rgb = stops[0].1;
+    for pair in stops.windows(2) {
+        let ((t0, a), (t1, b)) = (pair[0], pair[1]);
+        if t >= t0 && t <= t1 {
+            let k = (t - t0) / (t1 - t0);
+            rgb = [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+        }
+    }
+    // radial-gradient(circle at x% y%, colour 0%, transparent 50%), bottom layer first.
+    for (cx, cy, spot, alpha) in
+        [(0.4, 0.4, [120.0, 219.0, 255.0], 0.2), (0.8, 0.2, [255.0, 119.0, 198.0], 0.3), (0.2, 0.8, [120.0, 119.0, 198.0], 0.3)]
+    {
+        let (ox, oy) = (cx * w, cy * h);
+        let far =
+            [(0.0, 0.0), (w, 0.0), (0.0, h), (w, h)].iter().map(|(x, y)| ((x - ox) * (x - ox) + (y - oy) * (y - oy)).sqrt()).fold(0.0_f32, f32::max);
+        let r = ((p.x - ox) * (p.x - ox) + (p.y - oy) * (p.y - oy)).sqrt();
+        let a = alpha * (1.0 - r / (0.5 * far.max(1.0))).clamp(0.0, 1.0);
+        for k in 0..3 {
+            rgb[k] = rgb[k] * (1.0 - a) + spot[k] * a;
+        }
+    }
+    Color32::from_rgb(rgb[0].round() as u8, rgb[1].round() as u8, rgb[2].round() as u8)
 }
 
 /// The corner radius of [`card`]s and floating windows.
@@ -592,6 +865,24 @@ pub fn apply_with(ctx: &egui::Context, b: Brightness, accent: Accent, scheme: Sc
     v.override_text_color = Some(t.text);
     v.popup_shadow = egui::epaint::Shadow { offset: [0, 4], blur: 14, spread: 0, color: Color32::from_black_alpha(if t.dark { 120 } else { 60 }) };
     v.window_shadow = egui::epaint::Shadow { offset: [0, 8], blur: 28, spread: 0, color: Color32::from_black_alpha(if t.dark { 140 } else { 70 }) };
+    if t.brand {
+        // Brand: menus, popups and windows are solid black blocks with a strong black shadow.
+        v.window_fill = Color32::BLACK;
+        v.panel_fill = Color32::TRANSPARENT;
+        v.extreme_bg_color = t.input;
+        v.window_stroke = Stroke::new(1.0, t.float_border());
+        let shadow = egui::epaint::Shadow { offset: [0, 8], blur: 32, spread: 0, color: Color32::BLACK };
+        v.window_shadow = shadow;
+        v.popup_shadow = shadow;
+    } else if t.neu {
+        // Neumorphic: soft, borderless windows lifted by a cool shadow.
+        let (_, dark) = t.neu_shadows();
+        v.window_stroke = Stroke::NONE;
+        v.window_shadow = egui::epaint::Shadow { offset: [6, 8], blur: 26, spread: 0, color: dark };
+        v.popup_shadow = egui::epaint::Shadow { offset: [4, 6], blur: 18, spread: 0, color: dark };
+        v.window_corner_radius = CornerRadius::same(14);
+        v.menu_corner_radius = CornerRadius::same(10);
+    }
     let w = &mut v.widgets;
     craft_ui::theme::WidgetPalette { noninteractive: t.panel, inactive: t.button, hovered: t.hover, active: t.tool_active, open: t.hover }.apply_to(
         w,

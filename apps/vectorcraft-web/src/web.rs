@@ -148,7 +148,10 @@ async fn run(host: Host, canvas: web_sys::HtmlCanvasElement, moving: Option<Movi
                 el.remove();
             }
         }
-        (Err(e), None) => notice(&[&format!("VectorCraft failed to start: {}", js_err(e)), "A browser with WebGPU or WebGL2 is required."]),
+        (Err(e), None) => notice(&[
+            &format!("AI-Corel не запустился: {}", js_err(e)),
+            "Нужен браузер с WebGPU или WebGL2 (свежий Chrome, Edge, Firefox или Safari).",
+        ]),
         (Err(e), Some(kept)) => {
             log::error!("vectorcraft-web: couldn't restart the graphics: {}", js_err(e));
             give_up(slot.borrow_mut().take(), kept);
@@ -177,9 +180,7 @@ fn detect_language() {
         tags.extend(navigator.language());
     }
     i18n::set_system_locales(tags.as_slice());
-    if let Some(el) = element(LOADING_ID) {
-        el.set_text_content(Some(i18n::message(i18n::system_lang(), "Loading VectorCraft…").as_str()));
-    }
+    // The page's own loading block (progress bar and messages, studio/loader.js) stays as written.
 }
 
 /// The value of `name=` in the address's query, if given.
@@ -463,7 +464,25 @@ fn services(inbox: Inbox, place_inbox: PlaceInbox, ctx: egui::Context, locks: Op
         recovery_store: Some(Arc::new(BrowserStore { locks })),
         // File → Print: the browser's print dialog.
         print: Some(Box::new(BrowserPrint)),
+        // The title bar's way back to the site: one level up (STUDIO_CONFIG.homeUrl).
+        go_home: Some(Box::new(go_home)),
         ..Default::default()
+    }
+}
+
+/// Leave the editor for the site it lives on: `window.STUDIO_CONFIG.homeUrl` (studio/config.js),
+/// one level up ("../") without it.
+fn go_home() {
+    let Some(window) = web_sys::window() else { return };
+    let url = js_sys::Reflect::get(&window, &"STUDIO_CONFIG".into())
+        .ok()
+        .filter(|c| c.is_object())
+        .and_then(|c| js_sys::Reflect::get(&c, &"homeUrl".into()).ok())
+        .and_then(|u| u.as_string())
+        .filter(|u| !u.trim().is_empty())
+        .unwrap_or_else(|| "../".to_string());
+    if let Err(e) = window.location().set_href(&url) {
+        log::error!("couldn't go to {url}: {}", js_err(e));
     }
 }
 

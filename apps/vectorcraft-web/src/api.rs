@@ -8,8 +8,11 @@
 //! await vectorcraft.execute("object.rectangle", {x: 0, y: 0, width: 100, height: 50})  // engine command → its result
 //! await vectorcraft.request("ui.inspect")                      // control method → its result
 //! await vectorcraft.commands()                                 // command list
-//! const {base64} = await vectorcraft.screenshot()              // the canvas as PNG (base64)
+//! const {pngBase64} = await vectorcraft.screenshot()           // the window as PNG (base64)
 //! await vectorcraft.openFile("logo.svg", bytes)               // opened as a dropped file is
+//! vectorcraft.currentTheme(); await vectorcraft.setTheme("brand") // neuLight | neuDark | brand | modern | classic
+//! vectorcraft.wantsKeyboard()                                  // a text field has the keyboard
+//! vectorcraft.setBackdropFrame(left, top, cw, ch, vw, vh)      // Brand: line the backdrop up with the page
 //! vectorcraft.captureDownloads(true)                           // saves stay in the page…
 //! vectorcraft.files(); await vectorcraft.readFile("logo.png")  // …to be read back
 //! ```
@@ -106,7 +109,7 @@ fn request(method: &str, params: Value) -> js_sys::Promise {
         if sent {
             WAITING.with(|w| w.borrow_mut().push((rx, resolve, reject)));
         } else {
-            let _ = reject.call1(&JsValue::NULL, &js_sys::Error::new("VectorCraft is not running yet"));
+            let _ = reject.call1(&JsValue::NULL, &js_sys::Error::new("AI-Corel is not running yet"));
         }
     });
     repaint();
@@ -139,7 +142,18 @@ pub fn install() -> Result<(), JsValue> {
     set_fn(
         &obj,
         "screenshot",
-        Closure::<dyn Fn(JsValue) -> js_sys::Promise>::new(|params: JsValue| request("ui.screenshot", from_js(&params))).into_js_value(),
+        Closure::<dyn Fn(JsValue) -> js_sys::Promise>::new(|params: JsValue| {
+            // A page has no file to write the capture to: without `path`, send the PNG back.
+            let mut p = from_js(&params);
+            if let Some(o) = p.as_object_mut()
+                && !o.contains_key("path")
+                && !o.contains_key("data")
+            {
+                o.insert("data".into(), Value::Bool(true));
+            }
+            request("ui.screenshot", p)
+        })
+        .into_js_value(),
     )?;
     set_fn(
         &obj,
@@ -178,6 +192,52 @@ pub fn install() -> Result<(), JsValue> {
         })
         .into_js_value(),
     )?;
+    // AI-Corel's page (studio/): the theme, keyboard focus and the Brand backdrop's alignment.
+    set_fn(
+        &obj,
+        "currentTheme",
+        Closure::<dyn Fn() -> JsValue>::new(|| {
+            let id = CTX.with(|c| c.borrow().as_ref().map(|ctx| vectorcraft_ui_egui::theme::Tokens::get(ctx).theme_id()));
+            id.map_or(JsValue::NULL, JsValue::from_str)
+        })
+        .into_js_value(),
+    )?;
+    set_fn(
+        &obj,
+        "setTheme",
+        Closure::<dyn Fn(String) -> js_sys::Promise>::new(|theme: String| {
+            request("engine.execute", json!({"command": "window.theme", "params": {"theme": theme}}))
+        })
+        .into_js_value(),
+    )?;
+    set_fn(
+        &obj,
+        "wantsKeyboard",
+        Closure::<dyn Fn() -> bool>::new(|| CTX.with(|c| c.borrow().as_ref().is_some_and(|ctx| ctx.text_edit_focused()))).into_js_value(),
+    )?;
+    set_fn(
+        &obj,
+        "setBackdropFrame",
+        Closure::<dyn Fn(f64, f64, f64, f64, f64, f64)>::new(|left: f64, top: f64, cw: f64, ch: f64, vw: f64, vh: f64| {
+            // The page's viewport (vw × vh CSS px) in the canvas's points: the canvas sits at
+            // (left, top) and is cw × ch CSS px, which egui shows as its content rect.
+            CTX.with(|c| {
+                let Some(ctx) = c.borrow().as_ref().cloned() else { return };
+                let screen = ctx.content_rect();
+                let finite = [left, top, cw, ch, vw, vh].iter().all(|v| v.is_finite());
+                if !finite || cw <= 0.0 || ch <= 0.0 || vw <= 0.0 || vh <= 0.0 {
+                    return;
+                }
+                let (sx, sy) = (screen.width() / cw as f32, screen.height() / ch as f32);
+                let min = egui::pos2(screen.left() - left as f32 * sx, screen.top() - top as f32 * sy);
+                let frame = egui::Rect::from_min_size(min, egui::vec2(vw as f32 * sx, vh as f32 * sy));
+                ctx.data_mut(|d| d.insert_temp(egui::Id::new(vectorcraft_ui_egui::theme::BACKDROP_FRAME), frame));
+                ctx.request_repaint();
+            });
+        })
+        .into_js_value(),
+    )?;
+    set_fn(&obj, "product", JsValue::from_str("AI-Corel"))?;
     let w = web_sys::window().ok_or("no window")?;
     js_sys::Reflect::set(&w, &"vectorcraft".into(), &obj)?;
     Ok(())

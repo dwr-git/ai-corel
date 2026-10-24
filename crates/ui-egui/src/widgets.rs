@@ -20,14 +20,26 @@ pub fn paint_icon_button(ui: &mut Ui, resp: Response, icon: &str, tip: &str, sel
     let t = Tokens::get(ui.ctx());
     let rect = resp.rect;
     let size = rect.width();
-    let bg = if selected {
-        t.tool_active
-    } else if resp.hovered() {
-        t.hover
+    if t.neu {
+        // Neumorphic: the chosen button is pressed into the surface, a hovered one rises from it.
+        if selected {
+            ui.painter().rect_filled(rect, CornerRadius::same(7), t.tool_active);
+            theme::neu_pressed(ui.painter(), rect, 7.0, &t);
+        } else if resp.hovered() {
+            let p = ui.painter().clone().with_clip_rect(rect.expand(8.0));
+            p.add(theme::neu_raised_shape(rect, 7, 2.0, &t));
+            p.rect_filled(rect, CornerRadius::same(7), t.panel);
+        }
     } else {
-        Color32::TRANSPARENT
-    };
-    ui.painter().rect_filled(rect, CornerRadius::same(5), bg);
+        let bg = if selected {
+            t.tool_active
+        } else if resp.hovered() {
+            t.hover
+        } else {
+            Color32::TRANSPARENT
+        };
+        ui.painter().rect_filled(rect, CornerRadius::same(5), bg);
+    }
     let pad = (size * 0.2).round();
     icons::paint(ui, icon, rect.shrink(pad), if selected { t.text_strong } else { t.icon });
     resp.widget_info(|| icon_button_info(ui.is_enabled(), selected, tl!(tip)));
@@ -1431,6 +1443,11 @@ pub fn slider(ui: &mut Ui, slider: egui::Slider<'_>) -> Response {
         // all but vanished on Medium Dark's panel (#1662).
         v.widgets.inactive.bg_fill = t.button_border;
         v.selection.bg_fill = t.accent;
+        if t.neu {
+            // Neumorphic: the knob rises to the surface's colour under the pointer and in a drag.
+            v.widgets.hovered.bg_fill = t.panel;
+            v.widgets.active.bg_fill = t.panel;
+        }
         ui.add(slider.trailing_fill(true))
     })
     .inner

@@ -574,7 +574,7 @@ fn raise_floating(ctx: &egui::Context, key: &str) {
 /// A flyout's frame: drop shadow and border (the accent while it flashes).
 pub(crate) fn flyout_frame(t: &Tokens, flash: bool) -> egui::Frame {
     egui::Frame::NONE
-        .fill(t.panel)
+        .fill(t.float_fill())
         .stroke(if flash { Stroke::new(1.5, t.accent) } else { Stroke::new(1.0, t.input_border) })
         .shadow(egui::epaint::Shadow { offset: [0, 3], blur: 10, spread: 0, color: Color32::from_black_alpha(90) })
 }

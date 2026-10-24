@@ -3343,7 +3343,7 @@ fn home(app: &mut VectorcraftApp, ui: &mut Ui, rect: egui::Rect) {
     });
 }
 
-/// The Home screen's column: welcome, New / Open, Recent Files, presets and community links.
+/// The Home screen's column: welcome, New / Open, Recent Files and presets.
 fn home_content(app: &mut VectorcraftApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     ui.label(egui::RichText::new(tl!("Welcome to VectorCraft")).font(theme::semibold(26.0)).color(t.text));
@@ -3374,10 +3374,6 @@ fn home_content(app: &mut VectorcraftApp, ui: &mut Ui) {
             }
         }
     });
-    ui.add_space(28.0);
-    ui.label(egui::RichText::new(tl!("Community")).font(theme::semibold(14.0)).color(t.text));
-    ui.add_space(10.0);
-    crate::community::links(app, ui);
 }
 
 /// The Home screen's Recent Files (#663): the first of File › Open Recent Files, each its name and
@@ -3704,7 +3700,7 @@ fn task_bar(app: &mut VectorcraftApp, ui: &mut Ui, xf: &Xf) {
     let mut run: Option<(&str, serde_json::Value)> = None;
     egui::Area::new(id).order(egui::Order::Middle).fixed_pos(pos).show(ui.ctx(), |ui| {
         egui::Frame::NONE
-            .fill(t.panel)
+            .fill(t.float_fill())
             .stroke(Stroke::new(1.0, t.tool_active))
             .corner_radius(CornerRadius::same(5))
             .inner_margin(egui::Margin::symmetric(8, 6))
