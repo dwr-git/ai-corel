@@ -18,6 +18,13 @@
     screenshotMax: 1024,       // длинная сторона снимка экрана для модели, px
     openOnStart: false,
   }, window.STUDIO_CONFIG || {});
+  // Страница сборки лежит в b/<номер>/ (studio/build/versioned.sh); адреса из настроек — от папки приложения.
+  const fromRoot = (p) => { try { return new URL(p, window.STUDIO_ROOT || document.baseURI).href; } catch { return p; } };
+  CFG.api = fromRoot(CFG.api);
+  CFG.files = CFG.files ? fromRoot(CFG.files) : CFG.files;
+  CFG.homeUrl = fromRoot(CFG.homeUrl || '../');
+  // Редактор сам читает адрес домика из настроек.
+  window.STUDIO_CONFIG = Object.assign(window.STUDIO_CONFIG || {}, { homeUrl: CFG.homeUrl });
 
   // Тёмные темы редактора: панель помощника подстраивается под них.
   const DARK_THEMES = new Set(['dark', 'mediumDark', 'neuDark', 'brandDark']);
