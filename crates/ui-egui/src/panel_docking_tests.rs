@@ -56,7 +56,9 @@ fn harness(app: VectorcraftApp, size: egui::Vec2) -> Harness<'static, Vectorcraf
             if !ready {
                 crate::theme::install_fonts(ui.ctx());
                 egui_extras::install_image_loaders(ui.ctx());
-                crate::theme::apply(ui.ctx(), crate::theme::Brightness::MediumDark);
+                // Modern scheme: the opacity probes below look for the topmost opaque fill, and Brand
+                // (AI-Corel's default) lays translucent glass over a solid black base instead.
+                crate::theme::apply_with(ui.ctx(), crate::theme::Brightness::MediumDark, Default::default(), crate::theme::Scheme::Modern);
                 ready = true;
                 return;
             }
