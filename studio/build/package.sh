@@ -68,7 +68,26 @@ grep -q 'data-app-bytes="[1-9]' "$APP/index.html" || { echo "error: the page doe
 # чтобы было видно, какая версия скачана и какая стоит на сервере (панель помощника пишет её в шапке).
 BUILD="${AI_COREL_BUILD:-local}"
 BUILD_DATE="$(TZ=Europe/Minsk date +%Y-%m-%d)"
-printf '{"build":"%s","date":"%s","commit":"%s"}\n' "$BUILD" "$BUILD_DATE" "$STAMP" >"$APP/studio/version.json"
+# Файлы, которые меняются от сборки к сборке, но могли бы сохранить прежний размер, получают
+# «набивку» разной длины: программы заливки, которые пропускают файлы того же размера, всё равно
+# их заменят (иначе на сервере остаётся старый список частей и редактор грузится старый).
+PAD="$(printf '%*s' $(( (${BUILD//[^0-9]/} + 0) % 23 + 1 )) '' | tr ' ' '#')"
+printf '{"build":"%s","date":"%s","commit":"%s","pad":"%s"}\n' "$BUILD" "$BUILD_DATE" "$STAMP" "$PAD" >"$APP/studio/version.json"
+printf '# build %s, %s %s\n' "$BUILD" "$BUILD_DATE" "$PAD" >>"$APP/app/parts.txt"
+# Номер сборки — и в самой странице: панель сравнит его с version.json на сервере и подскажет,
+# если браузер показывает старую копию из кэша или на сервере остались файлы прошлой сборки.
+sed -i.bak "s#<html lang=\"ru\"#<html lang=\"ru\" data-build=\"$BUILD\"#" "$APP/index.html" && rm -f "$APP/index.html.bak"
+grep -q "data-build=\"$BUILD\"" "$APP/index.html" || { echo "error: the page has no build number" >&2; exit 1; }
+# index.php отдаёт ту же страницу, но запрещает браузеру брать её из кэша: после обновления папки
+# сразу открывается новая версия, без настроек nginx (nginx берёт index.php раньше index.html).
+cat >"$APP/index.php" <<'PHP'
+<?php
+// Страница редактора — всегда свежая: браузер не показывает старую копию после обновления папки.
+header('Content-Type: text/html; charset=utf-8');
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+readfile(__DIR__ . '/index.html');
+PHP
 ZIP="$DIST/ai-corel-build-$BUILD-$BUILD_DATE.zip"
 rm -f "$ZIP"
 (cd "$OUT" && zip -qr9 "$ZIP" ai-corel)

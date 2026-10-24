@@ -7,11 +7,11 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Brightness {
+    /// AI-Corel opens dark, with the Brand scheme (glass panels over the brand gradient).
+    #[default]
     Dark,
     MediumDark,
     MediumLight,
-    /// AI-Corel opens light (with the Neumorphic scheme: the soft light-blue look).
-    #[default]
     Light,
 }
 
@@ -92,8 +92,8 @@ impl Accent {
 /// (the neutral greys and blue accent of earlier versions).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Scheme {
-    #[default]
     Neumorphic,
+    #[default]
     Brand,
     Modern,
     Classic,

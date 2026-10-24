@@ -1245,10 +1245,10 @@ impl Default for Prefs {
             plugins_folder: String::new(),
             scratch_primary: s("Startup"),
             scratch_secondary: s("None"),
-            // AI-Corel: the light Neumorphic look and a Russian interface for a new user.
-            ui_brightness: s("light"),
+            // AI-Corel: the Brand look (gradient backdrop, glass panels) and a Russian interface for a new user.
+            ui_brightness: s("dark"),
             ui_accent: s("coral"),
-            ui_color_scheme: s("neumorphic"),
+            ui_color_scheme: s("brand"),
             canvas_color: s("matchUi"),
             auto_collapse_icon_panels: false,
             tool_group_labels: false,

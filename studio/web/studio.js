@@ -13,9 +13,7 @@
     api: 'api/assistant.php',
     labels: 'studio/ru-labels.json',
     language: 'ru',            // язык интерфейса редактора, если в настройках «как в системе»; '' — не трогать
-    defaultTheme: 'neuLight',  // тема при первом запуске
-    themeLight: 'neuLight',    // кнопка-луна переключает между этими двумя
-    themeDark: 'neuDark',
+    defaultTheme: 'brand',     // тема при первом запуске
     maxSteps: 10,              // сколько шагов подряд помощник может сделать за один запрос
     screenshotMax: 1024,       // длинная сторона снимка экрана для модели, px
     openOnStart: false,
@@ -245,6 +243,7 @@
     bulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>',
     hand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-9 9H5v-6z"/><path d="M12.5 5.5l6 6"/></svg>',
     sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+    palette: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2.2a2 2 0 0 0-1.4 3.4A1.6 1.6 0 0 1 12 22z"/><circle cx="7.5" cy="10.5" r="1.2"/><circle cx="12" cy="7.5" r="1.2"/><circle cx="16.5" cy="10.5" r="1.2"/></svg>',
     moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
     close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>',
     eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
@@ -269,7 +268,10 @@
         <div class="st-logo st-brain st-raised-sm" aria-hidden="true">${BRAIN}</div>
         <div class="st-title"><b>Помощник</b><small data-ref="sub">Загрузка редактора…</small></div>
         <button class="st-icon-btn" data-ref="barBtn" title="Быстрая строка (Ctrl+Shift+Пробел)" aria-label="Быстрая строка">${ICON.bolt}</button>
-        <button class="st-icon-btn" data-ref="theme" title="Светлая / тёмная тема" aria-label="Светлая или тёмная тема">${ICON.moon}</button>
+        <div class="st-theme-wrap">
+          <button class="st-icon-btn" data-ref="theme" title="Тема оформления" aria-label="Тема оформления" aria-haspopup="menu" aria-expanded="false">${ICON.palette}</button>
+          <div class="st-theme-menu" data-ref="themeMenu" role="menu" hidden></div>
+        </div>
         <button class="st-icon-btn" data-ref="hide" title="Свернуть панель" aria-label="Свернуть панель">${ICON.close}</button>
       </header>
       <div class="st-seg st-pressed" role="group" aria-label="Режим помощника">
@@ -546,7 +548,7 @@
         try { for (let i = 0; i < n; i++) await PC.exec('edit.undo'); cardResult(d, true); return { ok: true }; } catch (e) { cardResult(d, false, e.message); return { ok: false, error: e.message }; }
       }
       default:
-        return { ok: false, error: `Нет инструмента ${name}` };
+        return { ok: false, error: `Инструмента «${name}» нет. Доступны только: ${TOOL_NAMES.join(', ')}. Кликов по координатам нет: найди команду через find_commands и выполни её run_command или open_command.` };
     }
   }
 
@@ -636,9 +638,12 @@
     }
     return j;
   }
+  // Шлюз модели не передаёт инструменты штатно (вызовы приходят текстом) — запоминаем это.
+  let textTools = store.get('textTools', false);
   async function ask() {
-    const r = await postApi({ mode, messages: outgoing() });
+    const r = await postApi({ mode, messages: outgoing(), textTools });
     const j = await readAnswer(r);
+    if (j && j.ok && j.textTools && !textTools) { textTools = true; store.set('textTools', true); }
     if (!j.ok) {
       const e = new Error(j.error || 'Ошибка помощника');
       e.noVision = !!j.noVision;
@@ -675,7 +680,8 @@
         typing(false);
         const m = j.message || {};
         let calls = Array.isArray(m.tool_calls) ? m.tool_calls : [];
-        let content = m.content || '';
+        let content = (m.content || '').replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').replace(/<think>[\s\S]*?<\/think>/g, '')
+          .replace(/<?function=[\w.-]+>[\s\S]*?(<\/function>|$)/g, '').replace(/<\/?tool_call>/g, '').trim();
         if (!calls.length) {
           calls = inlineCalls(content);
           if (calls.length) content = content.replace(/\{[\s\S]*\}/, '').trim();
@@ -802,7 +808,7 @@
     const brand = themeId === 'brand';
     root.dataset.theme = panelThemeOf(themeId);
     document.documentElement.classList.toggle('studio-brand', brand);
-    $('theme').innerHTML = root.dataset.theme === 'light' ? ICON.moon : ICON.sun;
+    renderThemeMenu(themeId);
   }
   // Градиент фирменной темы редактор рисует по размеру всего окна, а не только холста.
   function syncBackdrop() {
@@ -812,13 +818,39 @@
     const r = c.getBoundingClientRect();
     try { v.setBackdropFrame(r.left, r.top, r.width, r.height, window.innerWidth, window.innerHeight); } catch { /* старая сборка */ }
   }
+  // Список тем вместо кнопки солнце/луна: сначала наши три, потом схемы редактора со светлым и тёмным видом.
+  const THEMES = [
+    ['brand', 'Фирменная'], ['neuLight', 'Неоморфная светлая'], ['neuDark', 'Неоморфная тёмная'], null,
+    ['modern:light', 'Современная светлая'], ['modern:dark', 'Современная тёмная'],
+    ['classic:light', 'Классическая светлая'], ['classic:dark', 'Классическая тёмная'],
+  ];
+  function renderThemeMenu(current) {
+    const menu = $('themeMenu');
+    if (!menu) return;
+    menu.innerHTML = THEMES.map((t) => (t
+      ? `<button role="menuitemradio" aria-checked="${t[0] === current}" data-theme-id="${t[0]}">${esc(t[1])}</button>`
+      : '<hr>')).join('');
+    menu.querySelectorAll('button').forEach((b) => { b.onclick = () => { toggleThemeMenu(false); setTheme(b.dataset.themeId); }; });
+  }
+  function toggleThemeMenu(open) {
+    const menu = $('themeMenu');
+    if (!menu) return;
+    const show = open == null ? menu.hidden : open;
+    menu.hidden = !show;
+    $('theme').setAttribute('aria-expanded', String(show));
+  }
   async function setTheme(themeId) {
     store.set('theme', themeId);
     applyPanelTheme(themeId);
     if (!PC.ready()) return;
     const v = VC();
+    const [scheme, brightness] = String(themeId).split(':');
     try {
-      if (typeof v.setTheme === 'function') { await v.setTheme(themeId); return; }
+      if (typeof v.setTheme === 'function') {
+        await v.setTheme(scheme);
+        if (brightness) await PC.exec('window.brightness', { brightness }).catch(() => {});
+        return;
+      }
     } catch { /* старая сборка — ниже запасной путь */ }
     // Без своих тем — хотя бы светлый или тёмный интерфейс.
     await PC.call('ui.set', { brightness: isDarkTheme(themeId) ? 'dark' : 'light' }).catch(() => {});
@@ -835,7 +867,11 @@
       await sleep(1000);
       if (document.hidden || !PC.ready()) continue;
       try {
-        const id = await shownTheme();
+        let id = await shownTheme();
+        // Для схем «Современная»/«Классическая» редактор сообщает только light/dark — пишем полностью.
+        const saved = store.get('theme', '');
+        if ((id === 'light' || id === 'dark') && saved.includes(':')) id = saved.split(':')[0] + ':' + id;
+        else if (id === 'light' || id === 'dark') id = 'modern:' + id;
         // Тему сменили в редакторе — панель подстраивается и запоминает её.
         if (id && (id !== store.get('theme', '') || root.dataset.theme !== panelThemeOf(id))) {
           store.set('theme', id);
@@ -856,6 +892,17 @@
           if (!v || !v.build) return;
           const d = String(v.date || '').split('-').reverse().join('.');
           $('sub').textContent = 'Модель: ' + j.model + ' · сборка ' + v.build + (d ? ' от ' + d : '');
+          const pageBuild = document.documentElement.dataset.build;
+          if (pageBuild && pageBuild !== String(v.build)) {
+            const page = +pageBuild, server = +v.build;
+            if (page > server) {
+              msg('note', `Страница — от сборки ${esc(pageBuild)}, а файлы на сервере частично остались от сборки ${esc(String(v.build))}: ` +
+                'программа заливки, похоже, пропустила файлы того же размера. Удалите старую папку на сервере целиком и залейте новую ' +
+                '(или включите в программе «перезаписывать всегда»).');
+            } else {
+              msg('note', `Открыта старая копия страницы из кэша браузера (сборка ${esc(pageBuild)}), а на сервере уже сборка ${esc(String(v.build))}. Нажмите <b>Ctrl+F5</b>, чтобы загрузить новую.`);
+            }
+          }
         }).catch(() => {});
       }
       else $('sub').textContent = j.login ? 'Нужно войти в систему' : (j.error || 'Нет связи с помощником');
@@ -882,7 +929,9 @@
     });
     $('clear').onclick = () => { if (!busy) { convo = []; showEmpty(); } };
     // Луна/солнце — между светлой и тёмной неоморфными; из фирменной — в светлую.
-    $('theme').onclick = () => setTheme(root.dataset.theme === 'light' ? CFG.themeDark : CFG.themeLight);
+    $('theme').onclick = (e) => { e.stopPropagation(); toggleThemeMenu(); };
+    document.addEventListener('pointerdown', (e) => { if (!e.target.closest || !e.target.closest('.st-theme-wrap')) toggleThemeMenu(false); }, true);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') toggleThemeMenu(false); });
     input.addEventListener('input', autosize);
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
@@ -913,7 +962,10 @@
     const shown = await shownTheme().catch(() => null);
     // Первый запуск — наша тема по умолчанию; дальше — то, что выбрано в редакторе.
     if (!saved) await setTheme(CFG.defaultTheme);
-    else if (shown && shown !== saved) { store.set('theme', shown); applyPanelTheme(shown); }
+    else if (shown && shown !== saved && !((shown === 'light' || shown === 'dark') && saved.endsWith(':' + shown))) {
+      const full = (shown === 'light' || shown === 'dark') ? 'modern:' + shown : shown;
+      store.set('theme', full); applyPanelTheme(full);
+    }
     else await setTheme(saved);
     if (store.get('open', CFG.openOnStart)) setOpen(true);
     commands().catch(() => {});
