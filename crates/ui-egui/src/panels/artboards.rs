@@ -443,7 +443,13 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
                         rename(app, &targets, &buf).ok();
                     }
                 } else {
-                    ui.painter().text(name_rect.left_center(), egui::Align2::LEFT_CENTER, name, egui::FontId::proportional(12.5), t.text);
+                    ui.painter().text(
+                        name_rect.left_center(),
+                        egui::Align2::LEFT_CENTER,
+                        crate::i18n::shown_name(name),
+                        egui::FontId::proportional(12.5),
+                        t.text,
+                    );
                 }
                 // The lock column, right of the name: the lock shows while the artboard is locked
                 // (dimmed under the pointer while it isn't), and a click locks or unlocks it.

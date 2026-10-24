@@ -526,6 +526,23 @@ pub fn tr_ctx<'a>(lang: Lang, context: &str, s: &'a str) -> &'a str {
     lang.catalog().contextual(context, s).unwrap_or_else(|| tr(lang, s))
 }
 
+/// A default name the app gives a document or artboard ("Untitled-3", "Artboard 2"), shown in the
+/// interface language ("Без названия-3", "Монтажная область 2"); any other name, one the user gave,
+/// comes back as it is. Only for showing: the file keeps the name it has.
+pub fn shown_name(name: &str) -> std::borrow::Cow<'_, str> {
+    for (prefix, sep) in [("Untitled", '-'), ("Artboard", ' ')] {
+        let Some(rest) = name.strip_prefix(prefix) else { continue };
+        let numbered = rest.strip_prefix(sep).is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
+        if rest.is_empty() || numbered {
+            let word = tr(current(), prefix);
+            if word != prefix {
+                return std::borrow::Cow::Owned(format!("{word}{rest}"));
+            }
+        }
+    }
+    std::borrow::Cow::Borrowed(name)
+}
+
 /// A name the app gives something (a default swatch's), translated where the current language has
 /// a `context` row for it; any other name (one the user gave) comes back as it is.
 pub fn t_name<'a>(context: &str, name: &'a str) -> &'a str {

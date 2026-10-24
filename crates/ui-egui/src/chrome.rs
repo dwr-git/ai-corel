@@ -170,7 +170,7 @@ pub fn system_title_bar(app: &VectorcraftApp) -> bool {
 pub fn window_title(app: &VectorcraftApp) -> String {
     app.session
         .active()
-        .map(|d| format!("{}{} \u{2014} {}", if d.is_dirty() { "*" } else { "" }, d.title(), crate::native_menu::APP_NAME))
+        .map(|d| format!("{}{} \u{2014} {}", if d.is_dirty() { "*" } else { "" }, crate::i18n::shown_name(&d.title()), crate::native_menu::APP_NAME))
         .unwrap_or_else(|| crate::native_menu::APP_NAME.into())
 }
 
@@ -477,7 +477,12 @@ fn tab_title(d: &vectorcraft_engine::DocState, zoom: f64, outline: bool, display
         let color = if d.doc.color_mode == vectorcraft_doc::ColorMode::Cmyk { "CMYK" } else { "RGB" };
         format!("{color}/{}", if outline { tl!("Outline") } else { tl!("Preview") })
     };
-    format!("{}{} @ {} ({mode})", d.title(), if d.is_dirty() { "*" } else { "" }, zoom_label(zoom, display_print_size).replace('%', " %"))
+    format!(
+        "{}{} @ {} ({mode})",
+        crate::i18n::shown_name(&d.title()),
+        if d.is_dirty() { "*" } else { "" },
+        zoom_label(zoom, display_print_size).replace('%', " %")
+    )
 }
 
 /// Whether a document tab's × comes before its title (macOS) rather than after it (Windows,
@@ -664,7 +669,7 @@ fn artboard_list(app: &VectorcraftApp, ui: &mut Ui, cur: usize) -> Option<usize>
     const ROWS: f32 = 10.0;
     let t = Tokens::get(ui.ctx());
     let boards = app.session.active().map(|d| d.doc.artboards.as_slice()).unwrap_or_default();
-    let shown = boards.get(cur).map_or_else(|| "–".to_string(), |a| format!("{}  {}", cur + 1, a.name));
+    let shown = boards.get(cur).map_or_else(|| "–".to_string(), |a| format!("{}  {}", cur + 1, crate::i18n::shown_name(&a.name)));
     // Under `drawn`, egui's temp data stores the pass the list was last drawn in.
     let drawn = ui.id().with("artboard-list");
     let height = ROW_H * ROWS;
@@ -708,7 +713,7 @@ fn artboard_list(app: &VectorcraftApp, ui: &mut Ui, cur: usize) -> Option<usize>
                             t.text_dim,
                         );
                         let name_start = number_end + 10.0;
-                        let name = egui::WidgetText::from(egui::RichText::new(&board.name).size(12.5)).into_galley(
+                        let name = egui::WidgetText::from(egui::RichText::new(crate::i18n::shown_name(&board.name)).size(12.5)).into_galley(
                             ui,
                             Some(egui::TextWrapMode::Truncate),
                             r.right() - 8.0 - name_start,
