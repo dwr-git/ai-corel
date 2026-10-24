@@ -135,11 +135,27 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     actions.push((tl!("Simplify"), "object.path.simplify"));
     actions.push((tl!("Arrange: Bring to Front"), "object.arrange.bringToFront"));
     actions.push((tl!("Lock"), "object.lock"));
-    let w = (ui.available_width() - 6.0) / 2.0;
-    for pair in actions.chunks(2) {
+    let full = ui.available_width();
+    let w = (full - 6.0) / 2.0;
+    // Two buttons a row; a label too long for half the row (as translations often are) gets the
+    // whole row instead of being cut.
+    let mut rows: Vec<Vec<(&str, &str)>> = vec![];
+    let mut half: Option<(&str, &str)> = None;
+    for a in actions {
+        if !widgets::label_fits(ui, a.0, w) {
+            rows.push(vec![a]);
+        } else if let Some(first) = half.take() {
+            rows.push(vec![first, a]);
+        } else {
+            half = Some(a);
+        }
+    }
+    rows.extend(half.map(|a| vec![a]));
+    for row in rows {
+        let bw = if row.len() == 2 || widgets::label_fits(ui, row.first().map_or("", |a| a.0), w) { w } else { full };
         ui.horizontal(|ui| {
-            for (label, id) in pair {
-                if widgets::flat_button(ui, label, w).clicked() {
+            for (label, id) in row {
+                if widgets::flat_button(ui, label, bw).clicked() {
                     crate::menus::invoke(app, id, json!({}));
                 }
             }

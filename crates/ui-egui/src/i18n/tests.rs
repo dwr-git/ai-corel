@@ -900,6 +900,10 @@ const MENU_KEEP_AS_IS: &[&str] = &[
     "[3P-Low View]",
 ];
 
+/// The built-in workspace names, which AI-Corel's Russian catalog translates.
+const RU_WORKSPACE_NAMES: &[&str] =
+    &["Essentials", "Essentials Classic", "Automation", "Layout", "Painting", "Printing and Proofing", "Tracing", "Touch", "Typography", "Web"];
+
 /// Every menu title, submenu, item and header label with its command and params (`""`/null for
 /// the ones that run nothing).
 fn menu_labels() -> Vec<(&'static str, &'static str, serde_json::Value)> {
@@ -1113,6 +1117,11 @@ fn kept_menu_names_are_menu_labels_left_in_english() {
     for keep in MENU_KEEP_AS_IS {
         assert!(labels.iter().any(|(l, ..)| l == keep), "`{keep}` isn't a menu label");
         for code in KEEPS_MENU_NAMES {
+            // AI-Corel's Russian names the built-in workspaces in Russian.
+            if code == "ru" && RU_WORKSPACE_NAMES.contains(keep) {
+                assert!(has(Lang::from_code(code).expect("registered"), keep), "ru: workspace `{keep}` isn't translated");
+                continue;
+            }
             assert!(!has(Lang::from_code(code).expect("registered"), keep), "{code}: `{keep}` is both kept and translated");
         }
     }

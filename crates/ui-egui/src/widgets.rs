@@ -53,9 +53,37 @@ pub fn flat_button(ui: &mut Ui, text: &str, width: f32) -> Response {
     let rect = rect.shrink2(vec2(0.0, 0.5));
     ui.painter().rect_filled(rect, CornerRadius::same(5), t.button);
     flat_fill(ui, rect, &resp);
-    ui.painter().with_clip_rect(rect).text(rect.center(), egui::Align2::CENTER_CENTER, tl!(text), egui::FontId::proportional(12.5), t.text_strong);
+    let cut = paint_fitted_label(ui, rect, tl!(text), t.text_strong);
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tl!(text)));
-    resp
+    if cut { resp.on_hover_text(tl!(text)) } else { resp }
+}
+
+/// Font sizes a button label may shrink to before it is cut short.
+const LABEL_SIZES: [f32; 3] = [12.5, 11.5, 10.5];
+
+/// Whether `text` fits a button `width` wide at the regular label size.
+pub fn label_fits(ui: &Ui, text: &str, width: f32) -> bool {
+    ui.painter().layout_no_wrap(tl!(text).to_string(), egui::FontId::proportional(LABEL_SIZES[0]), Color32::WHITE).size().x <= width - 10.0
+}
+
+/// Paint a button label centred in `rect`: at its regular size when it fits, else a little smaller
+/// (translations run longer than the English labels), else cut short with "…" from the end, so
+/// the start of the label always shows. Returns whether it was cut (the caller then shows the
+/// whole label as the tool tip).
+fn paint_fitted_label(ui: &Ui, rect: Rect, text: &str, color: Color32) -> bool {
+    let room = (rect.width() - 10.0).max(1.0);
+    for size in LABEL_SIZES {
+        let galley = ui.painter().layout_no_wrap(text.to_string(), egui::FontId::proportional(size), color);
+        if galley.size().x <= room {
+            ui.painter().with_clip_rect(rect).galley(rect.center() - galley.size() / 2.0, galley, color);
+            return false;
+        }
+    }
+    let mut job = egui::text::LayoutJob::simple_singleline(text.to_string(), egui::FontId::proportional(LABEL_SIZES[2]), color);
+    job.wrap = egui::text::TextWrapping::truncate_at_width(room);
+    let galley = ui.painter().layout_job(job);
+    ui.painter().with_clip_rect(rect).galley(rect.center() - galley.size() / 2.0, galley, color);
+    true
 }
 
 /// A [`flat_button`] that expands to fit localized labels wider than `min_width`.
@@ -96,15 +124,10 @@ pub fn split_button_named(ui: &mut Ui, text: &str, arrow_tip: &str, width: f32) 
     flat_fill(ui, main_rect, &main);
     flat_fill(ui, arrow_rect, &arrow);
     ui.painter().vline(split, rect.y_range().shrink(5.0), Stroke::new(1.0, t.panel));
-    ui.painter().with_clip_rect(main_rect).text(
-        main_rect.center(),
-        egui::Align2::CENTER_CENTER,
-        tl!(text),
-        egui::FontId::proportional(12.5),
-        t.text_strong,
-    );
+    let cut = paint_fitted_label(ui, main_rect, tl!(text), t.text_strong);
     icons::paint(ui, "chevron-down", Rect::from_center_size(arrow_rect.center(), vec2(12.0, 12.0)), t.text_dim);
     main.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tl!(text)));
+    let main = if cut { main.on_hover_text(tl!(text)) } else { main };
     if arrow_tip.is_empty() {
         return (main, arrow);
     }

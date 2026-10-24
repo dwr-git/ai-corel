@@ -46,7 +46,10 @@ pub fn app_bar(app: &mut VectorcraftApp, ui: &mut Ui) {
                 ui.add_space(6.0);
             }
             let on_home = menus::home_showing(app);
-            if widgets::icon_button(ui, "house", tl!("Home"), on_home, 20.0).clicked() {
+            // On the web the house at the right leads back to the site, so the start screen
+            // gets a grid of its own here.
+            let home_icon = if app.services.go_home.is_some() { "layout-grid" } else { "house" };
+            if widgets::icon_button(ui, home_icon, tl!("Home"), on_home, 20.0).clicked() {
                 app.run("app.home", json!({})).ok();
             }
             ui.add_space(2.0);
@@ -73,11 +76,20 @@ pub fn app_bar(app: &mut VectorcraftApp, ui: &mut Ui) {
             let ui = &mut rui;
             // The way back to the site the editor lives on (web): the far right.
             if app.services.go_home.is_some() {
-                if widgets::icon_button(ui, "log-out", tl!("To the site"), false, icon).clicked()
+                if widgets::icon_button(ui, "house", tl!("To the site"), false, icon).clicked()
                     && let Some(go) = app.services.go_home.as_mut()
                 {
                     go();
                 }
+                ui.add_space(2.0);
+            }
+            // Theme: a list to pick from, our three looks first.
+            if room >= 64.0 + 8.0 + 2.0 * (gap + icon) {
+                let current = theme_id(app);
+                let label = THEMES.iter().find(|(id, _)| *id == current).map_or("", |(_, l)| *l);
+                let tip = format!("{}: {}", tl!("Theme"), tl!(label));
+                let button = widgets::icon_button(ui, "palette", &tip, false, icon);
+                egui::Popup::menu(&button).show(|ui| theme_menu(app, ui, current));
                 ui.add_space(6.0);
             }
             // Workspace switcher: shows the current workspace, opens Window → Workspace.
@@ -111,6 +123,35 @@ pub fn app_bar(app: &mut VectorcraftApp, ui: &mut Ui) {
     });
     if custom {
         titlebar::caption_buttons(app, ui, bar.response.rect);
+    }
+}
+
+/// The title bar's themes, as `window.theme` names them: our three looks, then the others.
+const THEMES: [(&str, &str); 5] =
+    [("brand", "Brand"), ("neuLight", "Neumorphic Light"), ("neuDark", "Neumorphic Dark"), ("modern", "Modern"), ("classic", "Classic")];
+
+/// The current theme as `window.theme` names it.
+fn theme_id(app: &VectorcraftApp) -> &'static str {
+    match app.session.prefs.ui_color_scheme.as_str() {
+        "brand" => "brand",
+        "modern" => "modern",
+        "classic" => "classic",
+        _ if matches!(app.ui.brightness, theme::Brightness::Light | theme::Brightness::MediumLight) => "neuLight",
+        _ => "neuDark",
+    }
+}
+
+/// The title bar's theme list; picking one runs `window.theme`, as Window › Theme does.
+fn theme_menu(app: &mut VectorcraftApp, ui: &mut Ui, current: &str) {
+    ui.set_min_width(200.0);
+    for (i, (id, label)) in THEMES.iter().enumerate() {
+        if i == 3 {
+            ui.separator();
+        }
+        if ui.selectable_label(current == *id, tl!(label)).clicked() {
+            crate::menus::invoke(app, "window.theme", json!({ "theme": id }));
+            ui.close();
+        }
     }
 }
 

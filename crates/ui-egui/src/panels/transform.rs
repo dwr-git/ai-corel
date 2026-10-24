@@ -289,7 +289,7 @@ pub(crate) fn pie_rows(app: &mut VectorcraftApp, ui: &mut Ui, pie: (f64, f64), i
             }
         });
     }
-    if widgets::flat_button(ui, tl!("Invert Pie"), 90.0).clicked() {
+    if widgets::flat_button_fit(ui, tl!("Invert Pie"), 90.0).clicked() {
         app.run("object.setLiveShape", json!({"invertPie": true})).ok();
     }
 }
